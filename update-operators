@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -ex
+
 if [ $# -ne 1 ]; then
 	echo "Usage: $0 <version>"
 	exit 1
@@ -12,17 +14,35 @@ cd `dirname $0`
 # Generate Bundle Image for local storage operator
 pushd ../local-storage-operator/config
 git checkout release-$VERSION
-for i in `grep -rl quay.io/openshift/ manifests/stable`; do
-	sed -Ei "s#(quay\.io/openshift/origin-[a-z-]+)($|:latest)#\1:$VERSION#g" $i
+for i in manifests/stable/local-storage-operator.clusterserviceversion.yaml manifests/stable/image-references; do
+	sed -Ei "s#(quay\.io/[a-z/-]+)($|:latest)#\1:$VERSION#g" $i
 done
 podman build -f bundle.Dockerfile -t quay.io/vidux/openshift-local-storage-bundle:$VERSION
 podman push quay.io/vidux/openshift-local-storage-bundle:$VERSION
 git checkout manifests/stable
 popd
 
+# Generate Bundle Image for Data Foundation Operator
+pushd ../odf-operator
+git checkout release-$VERSION
+for i in bundle/manifests/odf-operator.clusterserviceversion.yaml config/manifests/bases/odf-operator.clusterserviceversion.yaml; do
+	sed -Ei "s#(quay\.io/[a-z/-]+)($|:latest)#\1:$VERSION#g" $i
+done
+podman build -f bundle.Dockerfile -t quay.io/vidux/openshift-odf-bundle:$VERSION
+podman push quay.io/vidux/openshift-odf-bundle:$VERSION
+git checkout .
+popd
+
+
 # Generate Template Catalog
-podman run --rm -v $PWD/local-storage-operator.template.yaml:/configs/local-storage-operator.template.yaml:z \
-	quay.io/operator-framework/opm alpha render-template semver -o yaml /configs/local-storage-operator.template.yaml \
-		> okd-catalog/catalog.yaml
+rm okd-catalog/*
+for i in odf local-storage; do
+	sed "s/TEMPLATE/$i/g" operator.template.yaml > $i.template.yaml
+	podman run --rm -v $PWD/$i.template.yaml:/configs/$i.template.yaml:z \
+		quay.io/operator-framework/opm alpha render-template semver -o yaml /configs/$i.template.yaml \
+		> okd-catalog/$i.yaml
+	rm $i.template.yaml
+done
+podman run --rm -v $PWD/okd-catalog:/okd-catalog:z quay.io/operator-framework/opm validate /okd-catalog
 podman build -f okd-catalog.Dockerfile -t quay.io/vidux/okd-operators:latest
 podman push quay.io/vidux/okd-operators:latest
