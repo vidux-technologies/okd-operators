@@ -1,0 +1,13 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: vidux-okd-operators
+  namespace: openshift-marketplace
+spec:
+  sourceType: grpc
+  image: quay.io/vidux/okd-operators:latest
+  displayName: community bundled OKD Operators (vidux)
+  publisher: Vidux
+  updateStrategy:
+    registryPoll:
+      interval: 10m

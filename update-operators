@@ -1,0 +1,28 @@
+#!/bin/bash
+
+if [ $# -ne 1 ]; then
+	echo "Usage: $0 <version>"
+	exit 1
+fi
+
+VERSION=$1
+
+cd `dirname $0`
+
+# Generate Bundle Image for local storage operator
+pushd ../local-storage-operator/config
+git checkout release-$VERSION
+for i in `grep -rl quay.io/openshift/ manifests/stable`; do
+	sed -Ei "s#(quay\.io/openshift/origin-[a-z-]+)($|:latest)#\1:$VERSION#g" $i
+done
+podman build -f bundle.Dockerfile -t quay.io/vidux/openshift-local-storage-bundle:$VERSION
+podman push quay.io/vidux/openshift-local-storage-bundle:$VERSION
+git checkout manifests/stable
+popd
+
+# Generate Template Catalog
+podman run --rm -v $PWD/local-storage-operator.template.yaml:/configs/local-storage-operator.template.yaml:z \
+	quay.io/operator-framework/opm alpha render-template semver -o yaml /configs/local-storage-operator.template.yaml \
+		> okd-catalog/catalog.yaml
+podman build -f okd-catalog.Dockerfile -t quay.io/vidux/okd-operators:latest
+podman push quay.io/vidux/okd-operators:latest

@@ -1,0 +1,12 @@
+Schema: olm.semver
+GenerateMajorChannels: true
+GenerateMinorChannels: false
+Stable:
+  Bundles:
+  - Image: quay.io/vidux/openshift-local-storage-bundle:4.15
+Fast:
+  Bundles:
+  - Image: quay.io/vidux/openshift-local-storage-bundle:4.15
+Candidate:
+  Bundles:
+  - Image: quay.io/vidux/openshift-local-storage-bundle:4.15
